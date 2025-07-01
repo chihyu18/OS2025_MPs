@@ -24,7 +24,8 @@ argfd(int n, int *pfd, struct file **pf)
   int fd;
   struct file *f;
 
-  argint(n, &fd);
+  if(argint(n, &fd) < 0)
+    return -1;
   if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
     return -1;
   if(pfd)
@@ -72,9 +73,7 @@ sys_read(void)
   int n;
   uint64 p;
 
-  argaddr(1, &p);
-  argint(2, &n);
-  if(argfd(0, 0, &f) < 0)
+  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0)
     return -1;
   return fileread(f, p, n);
 }
@@ -85,10 +84,8 @@ sys_write(void)
   struct file *f;
   int n;
   uint64 p;
-  
-  argaddr(1, &p);
-  argint(2, &n);
-  if(argfd(0, 0, &f) < 0)
+
+  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0)
     return -1;
 
   return filewrite(f, p, n);
@@ -113,8 +110,7 @@ sys_fstat(void)
   struct file *f;
   uint64 st; // user pointer to struct stat
 
-  argaddr(1, &st);
-  if(argfd(0, 0, &f) < 0)
+  if(argfd(0, 0, &f) < 0 || argaddr(1, &st) < 0)
     return -1;
   return filestat(f, st);
 }
@@ -262,10 +258,8 @@ create(char *path, short type, short major, short minor)
     return 0;
   }
 
-  if((ip = ialloc(dp->dev, type)) == 0){
-    iunlockput(dp);
-    return 0;
-  }
+  if((ip = ialloc(dp->dev, type)) == 0)
+    panic("create: ialloc");
 
   ilock(ip);
   ip->major = major;
@@ -274,44 +268,37 @@ create(char *path, short type, short major, short minor)
   iupdate(ip);
 
   if(type == T_DIR){  // Create . and .. entries.
+    dp->nlink++;  // for ".."
+    iupdate(dp);
     // No ip->nlink++ for ".": avoid cyclic ref count.
     if(dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
-      goto fail;
+      panic("create dots");
   }
 
   if(dirlink(dp, name, ip->inum) < 0)
-    goto fail;
-
-  if(type == T_DIR){
-    // now that success is guaranteed:
-    dp->nlink++;  // for ".."
-    iupdate(dp);
-  }
+    panic("create: dirlink");
 
   iunlockput(dp);
 
   return ip;
-
- fail:
-  // something went wrong. de-allocate ip.
-  ip->nlink = 0;
-  iupdate(ip);
-  iunlockput(ip);
-  iunlockput(dp);
-  return 0;
 }
 
 uint64
 sys_open(void)
 {
+  // TODO: Symbolic links to Files
+  // open() should handle symbolic link
+  // If the file is a symbolic link, and O_NOFOLLOW is not specified,
+  // then you should read the path in the symbolic link,
+  // and return the corresponding file.
+
   char path[MAXPATH];
   int fd, omode;
   struct file *f;
   struct inode *ip;
   int n;
 
-  argint(1, &omode);
-  if((n = argstr(0, path, MAXPATH)) < 0)
+  if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
     return -1;
 
   begin_op();
@@ -394,9 +381,9 @@ sys_mknod(void)
   int major, minor;
 
   begin_op();
-  argint(1, &major);
-  argint(2, &minor);
   if((argstr(0, path, MAXPATH)) < 0 ||
+     argint(1, &major) < 0 ||
+     argint(2, &minor) < 0 ||
      (ip = create(path, T_DEVICE, major, minor)) == 0){
     end_op();
     return -1;
@@ -409,6 +396,10 @@ sys_mknod(void)
 uint64
 sys_chdir(void)
 {
+  // TODO: Symbolic Link to Directories
+  // You can modify this to cd into a symbolic link
+  // The modification may not be necessary,
+  // depending on you implementation.
   char path[MAXPATH];
   struct inode *ip;
   struct proc *p = myproc();
@@ -438,8 +429,7 @@ sys_exec(void)
   int i;
   uint64 uargv, uarg;
 
-  argaddr(1, &uargv);
-  if(argstr(0, path, MAXPATH) < 0) {
+  if(argstr(0, path, MAXPATH) < 0 || argaddr(1, &uargv) < 0){
     return -1;
   }
   memset(argv, 0, sizeof(argv));
@@ -482,7 +472,8 @@ sys_pipe(void)
   int fd0, fd1;
   struct proc *p = myproc();
 
-  argaddr(0, &fdarray);
+  if(argaddr(0, &fdarray) < 0)
+    return -1;
   if(pipealloc(&rf, &wf) < 0)
     return -1;
   fd0 = -1;
@@ -501,5 +492,23 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64
+sys_symlink(void)
+{
+  // TODO: symbolic link
+  // You should implement this symlink system call.
+  // char target[MAXPATH], path[MAXPATH];
+  // int fd;
+  // struct file *f;
+  // struct inode *ip;
+
+  // if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+  //   return -1;
+  
+  panic("You should implement symlink system call.");
+
   return 0;
 }

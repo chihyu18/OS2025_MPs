@@ -33,9 +33,6 @@ memmove(void *dst, const void *src, uint n)
   const char *s;
   char *d;
 
-  if(n == 0)
-    return dst;
-  
   s = src;
   d = dst;
   if(s < d && s + n > d){
@@ -105,3 +102,15 @@ strlen(const char *s)
   return n;
 }
 
+char* 
+strcat(char* destination, const char* source)
+{
+  char* ptr = destination + strlen(destination);
+
+  while (*source != '\0')
+    *ptr++ = *source++;
+
+  *ptr = '\0';
+
+  return destination;
+}
