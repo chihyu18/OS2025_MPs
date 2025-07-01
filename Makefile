@@ -56,7 +56,7 @@ LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
@@ -90,7 +90,7 @@ tags: $(OBJS) _init
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
 _%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $^
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
@@ -132,9 +132,16 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_symlinkdir\
+	$U/_symlinkdir_private\
+	$U/_symlinkfile\
+	$U/_symlinkfile_private\
+	$U/_bigfile\
+	$U/_bigfile_private\
 
-fs.img: mkfs/mkfs README $(UPROGS)
-	mkfs/mkfs fs.img README $(UPROGS)
+
+fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
+	mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)
 
 -include kernel/*.d user/*.d
 
@@ -157,7 +164,6 @@ CPUS := 3
 endif
 
 QEMUOPTS = -machine virt -bios none -kernel $K/kernel -m 128M -smp $(CPUS) -nographic
-QEMUOPTS += -global virtio-mmio.force-legacy=false
 QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
@@ -171,3 +177,50 @@ qemu-gdb: $K/kernel .gdbinit fs.img
 	@echo "*** Now run 'gdb' in another window." 1>&2
 	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
 
+
+##
+##  FOR grading MP
+##
+
+-include conf/lab.mk
+
+ifneq ($(V),@)
+GRADEFLAGS += -v
+endif
+
+print-gdbport:
+	@echo $(GDBPORT)
+
+grade:
+	@$(MAKE) clean > /dev/null || \
+	  (echo "'make clean' failed.  HINT: Do you have another running instance of xv6?" && exit 1)
+	./grade-bigfile 2>&1 | tee bigfile.csv
+	./grade-symlinkfile 2>&1 | tee symlinkfile.csv
+	./grade-symlinkdir 2>&1	| tee symlinkdir.csv
+	@$(MAKE) clean > /dev/null
+
+private:
+	@$(MAKE) clean > /dev/null || \
+	  (echo "'make clean' failed.  HINT: Do you have another running instance of xv6?" && exit 1)
+	./grade-bigfile-private 2>&1 | tee bigfile_private.csv
+	./grade-symlinkfile-private 2>&1 | tee symlinkfile_private.csv
+	./grade-symlinkdir-private 2>&1	| tee symlinkdir_private.csv
+	@$(MAKE) clean > /dev/null
+
+bigfile:
+	@$(MAKE) clean > /dev/null || \
+          (echo "'make clean' failed.  HINT: Do you have another running instance of xv6?" && exit 1)
+	./grade-bigfile 2>&1 | tee bigfile.csv
+	@$(MAKE) clean > /dev/null
+
+symlinkfile:
+	@$(MAKE) clean > /dev/null || \
+          (echo "'make clean' failed.  HINT: Do you have another running instance of xv6?" && exit 1)
+	./grade-symlinkfile 2>&1 | tee symlinkfile.csv
+	@$(MAKE) clean > /dev/null
+
+symlinkdir:
+	@$(MAKE) clean > /dev/null || \
+          (echo "'make clean' failed.  HINT: Do you have another running instance of xv6?" && exit 1)
+	./grade-symlinkdir 2>&1 | tee symlinkdir.csv
+	@$(MAKE) clean > /dev/null

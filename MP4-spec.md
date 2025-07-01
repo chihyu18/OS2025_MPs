@@ -101,7 +101,7 @@ loops.
     - Section including team members, team member contribution.
     - Section answering the questions/explanation of the trace code section.
     - Section explaining your implementation.
-    - Write the report in `mp4-report.md`.
+    - Write the report in "MP4_report_[GroupNumber].md".
 3. Demo (20%)
     - Answer questions from TAs in 20 minutes.
 4. Bonus (5%)
