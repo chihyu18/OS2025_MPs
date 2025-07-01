@@ -47,8 +47,6 @@ addrs. Note that the length of addrs is always 13.
 4. Make sure `itrunc()` frees all blocks of a file, including doubly-indirect blocks.
 5. You can pass problem 1 with modifying only: `fs.c`, `fs.h` and `file.h`.
 
-## Verification
-
 ## Part 2:  Symbolic Links to Files
 
 ### Description
@@ -68,8 +66,6 @@ symlink is already added in xv6, so you don’t need to worry about that.
 8. Don’t worry about other system calls (e.g., link and unlink). They must not follow symbolic links; these system calls operate on the symbolic link itself.
 9. You do not have to handle symbolic links to directories in this part.
 10. You can pass problem 2 with modifying only: sysfile.c.
-
-### Verification
 
 ## Part 3:  Symbolic Links to Directories
 
