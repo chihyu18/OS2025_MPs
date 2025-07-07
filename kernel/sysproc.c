@@ -91,3 +91,22 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// self-added
+// remember its argument in a new variable in the proc structure (see kernel/proc.h)
+// return 0 if it executes successfully, otherwise, return -1
+uint64
+sys_trace(void)
+{
+  int mask;
+  struct proc *p = myproc();
+
+  argint(0, &mask);
+  p->trace_mask = mask;
+
+  if(mask < 0 || mask > 0xFFFFFFFF) {
+    return -1; // invalid mask
+  }
+
+  return 0;
+}
