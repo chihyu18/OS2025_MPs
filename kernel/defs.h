@@ -58,6 +58,7 @@ void            itrunc(struct inode*);
 void            ramdiskinit(void);
 void            ramdiskintr(void);
 void            ramdiskrw(struct buf*);
+uint64          freemem(); // self-added
 
 // kalloc.c
 void*           kalloc(void);
@@ -106,6 +107,7 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
+uint64          proccount(void); // self-added
 
 // swtch.S
 void            swtch(struct context*, struct context*);

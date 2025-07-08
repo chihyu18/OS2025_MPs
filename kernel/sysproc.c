@@ -5,6 +5,8 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+// self-added
+#include "sysinfo.h"
 
 uint64
 sys_exit(void)
@@ -106,6 +108,32 @@ sys_trace(void)
 
   if(mask < 0 || mask > 0xFFFFFFFF) {
     return -1; // invalid mask
+  }
+
+  return 0;
+}
+
+// copy a struct sysinfo back to user space; 
+// see sys_fstat() (kernel/sysfile.c) and filestat() (kernel/file.c) for examples of how to do that using copyout()
+// sysinfo should return 0 if it executes successfully, otherwise, return -1.
+// Make sure sysinfo could be traced by the system call trace
+// To collect the amount of free memory, add a function to kernel/kalloc.c
+// To collect the number of processes, add a function to kernel/proc.c
+uint64
+sys_sysinfo(void)
+{
+  uint64 infoaddr;
+  struct sysinfo info;
+  struct proc *p = myproc();
+
+  argaddr(0, &infoaddr); // Get the address to copy sysinfo structure to user space
+
+  info.freemem = freemem();
+  info.nproc = proccount();
+
+  // Copy the sysinfo structure to user space
+  if(copyout(p->pagetable, infoaddr, (char*)&info, sizeof(info)) < 0) {
+    return -1; // error in copying
   }
 
   return 0;
