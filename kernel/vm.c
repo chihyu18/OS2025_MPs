@@ -460,8 +460,44 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 void vmprint(pagetable_t pagetable)
 {
   /* mp3 TODO */
-  panic("not implemented yet\n");
+  printf("page table %p\n", pagetable);
+  vmprint_walk(pagetable, 2, 0);
 }
+
+/* DFS */
+void vmprint_walk(pagetable_t pagetable, int level, uint64 va_base)
+{
+  for (int i = 0; i < 512; i++)
+  {
+    pte_t *pte = &pagetable[i];
+    if (*pte & PTE_V)
+    {
+      uint64 pa = PTE2PA(*pte);
+      uint64 va = va_base | ((uint64)i << (12 + 9 * level)); // accumulate VA
+
+      // 印出對應縮排
+      for (int _ = 0; _ < (3 - level) * 2; _++)
+        printf(" ");
+      
+      printf("%d: pte=%p va=%p pa=%p", i, pte, va, pa);
+
+      // 權限位元
+      if (*pte & PTE_V) printf(" V");
+      if (*pte & PTE_R) printf(" R");
+      if (*pte & PTE_W) printf(" W");
+      if (*pte & PTE_X) printf(" X");
+      if (*pte & PTE_U) printf(" U");
+      printf("\n");
+
+      // 若不是 leaf（沒有 RWX），則遞迴下一層
+      if ((*pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+        pagetable_t child = (pagetable_t)pa;
+        vmprint_walk(child, level - 1, va);
+      }
+    }
+  }
+}
+
 
 /* Map pages to physical memory or swap space. */
 int madvise(uint64 base, uint64 len, int advice)
