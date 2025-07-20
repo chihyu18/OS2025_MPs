@@ -246,7 +246,7 @@ void proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
-  // self-added
+  // self-added: mp3_1
   uvmunmap(pagetable, USYSCALL, 1, 0);
   uvmfree(pagetable, sz);
 }
@@ -298,10 +298,17 @@ int growproc(int n)
   sz = p->sz;
   if (n > 0)
   {
-    if ((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W)) == 0)
+    // if ((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W)) == 0)
+    // {
+    //   return -1;
+    // }
+
+    // self-added
+    if((n + sz) > MAXVA) //PGROUNDDOWN(n + sz);?
     {
-      return -1;
+      return -1; // prevent overflow
     }
+    sz += n;
   }
   else if (n < 0)
   {

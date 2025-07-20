@@ -47,7 +47,16 @@ void usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   // mp3 TODO
-  if (r_scause() == 8)
+  // self-added
+  if(r_scause() == 13 || r_scause() == 15){ // store/load
+    /* catch page fault */
+    // printf("usertrap(): page fault at %p pid=%d\n", r_stval(), p->pid);
+    if (handle_pgfault() < 0) {
+      // page fault handling failed, kill the process
+      setkilled(p);
+    }
+  }
+  else if (r_scause() == 8)
   {
     // system call
 
