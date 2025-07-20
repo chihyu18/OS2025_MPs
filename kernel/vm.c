@@ -479,7 +479,7 @@ void vmprint_walk(pagetable_t pagetable, int level, uint64 va_base)
   for (int i = 0; i < 512; i++)
   {
     pte_t *pte = &pagetable[i];
-    if (*pte & PTE_V)
+    if (*pte & (PTE_V | PTE_S))
     {
       uint64 pa = PTE2PA(*pte);
       uint64 va = va_base | ((uint64)i << (12 + 9 * level)); // accumulate VA
@@ -488,14 +488,17 @@ void vmprint_walk(pagetable_t pagetable, int level, uint64 va_base)
       for (int _ = 0; _ < (3 - level) * 2; _++)
         printf(" ");
       
-      printf("%d: pte=%p va=%p pa=%p", i, pte, va, pa);
-
+      printf("%d: pte=%p va=%p pa=%p ", i, pte, va, pa);
+      if(*pte & PTE_S) {
+        printf(" blockno: %p", PTE2BLOCKNO(*pte));
+      }
       // 權限位元
       if (*pte & PTE_V) printf(" V");
       if (*pte & PTE_R) printf(" R");
       if (*pte & PTE_W) printf(" W");
       if (*pte & PTE_X) printf(" X");
       if (*pte & PTE_U) printf(" U");
+      if (*pte & PTE_S) printf(" S"); // mp3_3
       printf("\n");
 
       // 若不是 leaf（沒有 RWX），則遞迴下一層
@@ -512,5 +515,75 @@ void vmprint_walk(pagetable_t pagetable, int level, uint64 va_base)
 int madvise(uint64 base, uint64 len, int advice)
 {
   /* mp3 TODO */
-  panic("not implemented yet\n");
+  // panic("not implemented yet\n");
+  struct proc *p = myproc();
+  // check range
+  if (base + len > p->sz)
+  {
+    return -1; // invalid range
+  }
+  // check alignment
+  // if (base % PGSIZE != 0 || len % PGSIZE != 0)
+  // {
+  //   return -1; // invalid alignment
+  // }
+
+  if(advice == MADV_NORMAL)
+  {
+    // Do nothing, just return success
+  }
+  else if(advice == MADV_DONTNEED)
+  {
+    // move the pages within the range to disk, set S & unset V
+    uint64 a, end = PGROUNDUP(base + len);
+
+    for (a = PGROUNDDOWN(base); a < end; a += PGSIZE) {
+      pte_t *pte = walk(p->pagetable, a, 0);
+      if (pte && (*pte & PTE_V)) {
+        uint64 pa = PTE2PA(*pte);
+        begin_op();
+        uint blkno = balloc_page(ROOTDEV);
+        if (blkno == 0)
+        {
+          end_op();
+          return -1; // out of disk space
+        }
+
+        write_page_to_disk(ROOTDEV, (char*)pa, blkno);
+        end_op();
+
+        kfree((void*)pa);  // Free physical page
+
+        *pte = BLOCKNO2PTE(blkno) | (PTE_FLAGS(*pte) & ~PTE_V) | PTE_S;
+      }
+    }
+  }
+  else if(advice == MADV_WILLNEED)
+  {
+    // allocate pages within the range, set V & unset S
+    // swap in those pages
+    uint64 a, end = PGROUNDUP(base + len);
+    for (a = PGROUNDDOWN(base); a < end; a += PGSIZE) {
+      pte_t *pte = walk(p->pagetable, a, 0);
+      if (pte && (*pte & PTE_S)) {
+        // swap in
+        uint blkno = PTE2BLOCKNO(*pte);
+        char *mem = kalloc();
+        if (mem == 0) {
+          return -1; // out of memory
+        }
+        begin_op();
+        read_page_from_disk(ROOTDEV, mem, blkno);
+        bfree_page(ROOTDEV, blkno); // free the block number
+        end_op();
+        if (mappages(p->pagetable, a, PGSIZE, (uint64)mem, PTE_R | PTE_W | PTE_X | PTE_U) < 0) {
+          kfree(mem);
+          return -1;
+        }
+        *pte = PA2PTE((uint64)mem) | (PTE_FLAGS(*pte) & ~PTE_S) | PTE_V;
+      }
+    }
+  }
+  return 0;
+
 }
