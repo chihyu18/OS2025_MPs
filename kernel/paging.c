@@ -22,12 +22,26 @@ int handle_pgfault()
         printf("Page fault at invalid address: %p\n", va);
         return -1; // Invalid address
     }
-    /* Check if the page is already mapped */
-    // pte_t *pte = walk(p->pagetable, va, 0);
-    // if (pte && (*pte & PTE_V)) {
-    //     printf("Page fault at already mapped address: %p\n", va);
-    //     return -1; // Page already mapped
-    // }
+    /* check if the page is swapped, if so, bring it in? */
+    pte_t *pte = walk(p->pagetable, va, 0);
+    if (pte && (*pte & PTE_S)) {
+        // swap in
+        uint blkno = PTE2BLOCKNO(*pte);
+        char *mem = kalloc();
+        if (mem == 0) {
+            return -1; // out of memory
+        }
+        begin_op();
+        read_page_from_disk(ROOTDEV, mem, blkno);
+        bfree_page(ROOTDEV, blkno); // free the block number
+        end_op();
+        if (mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, PTE_R | PTE_W | PTE_X | PTE_U) < 0) {
+            kfree(mem);
+            return -1;
+        }
+        *pte = PA2PTE((uint64)mem) | (PTE_FLAGS(*pte) & ~PTE_S) | PTE_V;
+        return 0;
+    }
     /* Allocate a new page */
     char *mem = kalloc();
     if (mem == 0) {
