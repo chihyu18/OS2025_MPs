@@ -488,9 +488,9 @@ void vmprint_walk(pagetable_t pagetable, int level, uint64 va_base)
       for (int _ = 0; _ < (3 - level) * 2; _++)
         printf(" ");
       
-      printf("%d: pte=%p va=%p pa=%p ", i, pte, va, pa);
+      printf("%d: pte=%p va=%p pa=%p", i, pte, va, pa);
       if(*pte & PTE_S) {
-        printf(" blockno: %p", PTE2BLOCKNO(*pte));
+        printf(" blockno=%p", PTE2BLOCKNO(*pte));
       }
       // 權限位元
       if (*pte & PTE_V) printf(" V");
