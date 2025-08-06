@@ -28,6 +28,10 @@ struct spinlock wait_lock;
 
 struct proclistnode proclistnodes[NPROCLISTNODE];
 struct proclist readylist;
+// self-added
+struct sortedproclist SJFreadylist; // L1
+struct sortedproclist priorityreadylist; // L2
+struct proclist RRreadylist; // L3
 
 struct channel channels[NCHANNEL];
 
@@ -599,10 +603,21 @@ void
 implicityield(void)
 {
   struct proc *p = myproc();
-  if(ticks - p->startrunningticks >= 1) {
-    // yield round robin scheduling
-    // actually ticks - p->startrunningticks should be 1
+  // if(ticks - p->startrunningticks >= 1) {
+  //   // yield round robin scheduling
+  //   // actually ticks - p->startrunningticks should be 1
+  //   yield();
+  // }
+
+  // self-added
+  if(p->queuelevel == 1 && cmptopsortedproclist(&SJFreadylist, p)) {
+    // if the process is in SJFreadylist and it is not the top process,
+    // yield to the top process
     yield();
+  } else if(p->queuelevel == 3 && ticks - p->startrunningticks >= 10) {
+    // if the process is in RRreadylist, we always yield
+    yield();
+
   }
 }
 
@@ -653,6 +668,11 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+  // self-added: update estimated bust time
+  p->estimatedticks = (p->burstticks + p->estimatedticks) / 2;
+  p->burstticks = 0; // reset burst ticks
+  p->startrunningticks = ticks; // reset start running ticks
+  //
   procstatelog(p);
 
   if((pn = allocproclistnode(p)) == 0) {
@@ -857,6 +877,31 @@ procstatelog(struct proc *p)
           p->pid, ticks, procstate2str(p->state), p->priority);
 }
 
+// self-added
+int sjfcompare(struct proc *p1, struct proc *p2)
+{
+  uint remainingticks1 = p1->estimatedticks - p1->burstticks;
+  uint remainingticks2 = p2->estimatedticks - p2->burstticks;
+  if(remainingticks1 < remainingticks2) {
+    return -1; // p1 has higher priority
+  } else if(remainingticks1 > remainingticks2) {
+    return 1; // p2 has higher priority
+  } else {
+    return (p1->pid < p2->pid) ? -1 : 1; // equal priority
+  }
+}
+
+int prioritycompare(struct proc *p1, struct proc *p2)
+{
+  if(p1->priority < p2->priority) {
+    return -1; // p1 has higher priority
+  } else if(p1->priority > p2->priority) {
+    return 1; // p2 has higher priority
+  } else {
+    return (p1->pid < p2->pid) ? -1 : 1; // equal priority
+  }
+}
+
 // initialize process list related data structures.
 void
 proclistinit(void)
@@ -868,7 +913,11 @@ proclistinit(void)
     initlock(&proclistnodes[i].lock, "proclistnode");
   }
   // initialize readylist.
-  initproclist(&readylist);
+  // initproclist(&readylist);
+  // self-added
+  initsortedproclist(&SJFreadylist, sjfcompare);
+  initsortedproclist(&priorityreadylist, prioritycompare);
+  initproclist(&RRreadylist);
   // initialize channels.
   for(i = 0; i < NCHANNEL; i++){
     channels[i].used = 0;
@@ -1163,7 +1212,22 @@ pushreadylist(struct proc *p)
   if((pn = allocproclistnode(p)) == 0) {
     panic("pushreadylist: allocproclistnode");
   }
-  pushbackproclist(&readylist, pn);
+  // pushbackproclist(&readylist, pn);
+  // self-added: push to corresponding ready list based on process' priority
+  if(p->priority > 99){
+    // TODO: pushsortedproclist
+    p->queuelevel = 1;
+    pushsortedproclist(&SJFreadylist, pn);
+  }
+  else if(p->priority > 49){
+    // TODO: pushsortedproclist
+    p->queuelevel = 2;
+    pushsortedproclist(&priorityreadylist, pn);
+  }
+  else{
+    p->queuelevel = 3;
+    pushbackproclist(&RRreadylist, pn);
+  }
 }
 
 // scheduler managed, pop from ready list
@@ -1172,7 +1236,18 @@ popreadylist()
 {
   struct proc *p;
   struct proclistnode *pn;
-  if((pn = popfrontproclist(&readylist)) == 0) {
+  // if((pn = popfrontproclist(&readylist)) == 0) {
+  //   return 0; // no runnable processes
+  // }
+
+  // self-added
+  if((pn = popsortedproclist(&SJFreadylist)) != 0) {
+    // SJF ready list has higher priority
+  } else if((pn = popsortedproclist(&priorityreadylist)) != 0) {
+    // priority ready list has higher priority
+  } else if((pn = popfrontproclist(&RRreadylist)) != 0) {
+    // round robin ready list
+  } else {
     return 0; // no runnable processes
   }
   p = pn->p;
