@@ -110,6 +110,7 @@ struct proc {
   int estimatedticks;        // estimated ticks for the process (for SJF)
   int burstticks;          // ticks used by the process since it started running
   int queuelevel;         // queue level for the process (for MLFQ)
+  int startreadyticks;         // ticks the process has been ready (for MLFQ)
 
   // scheduler related
   int startrunningticks;       // ticks when the process started running
