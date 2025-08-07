@@ -108,9 +108,9 @@ struct proc {
   char name[16];               // Process name (debugging)
   // self-added
   int estimatedticks;        // estimated ticks for the process (for SJF)
-  int burstticks;          // ticks used by the process since it started running
-  int queuelevel;         // queue level for the process (for MLFQ)
-  int startreadyticks;         // ticks the process has been ready (for MLFQ)
+  int burstticks;            // ticks used by the process since it started running
+  int queuelevel;            // queue level for the process (for MLFQ)
+  int startreadyticks;       // ticks the process has been ready (for MLFQ::aging)
 
   // scheduler related
   int startrunningticks;       // ticks when the process started running

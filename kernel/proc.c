@@ -394,7 +394,7 @@ priorfork(int priority, int statelogenabled)
   acquire(&np->lock);
   procstatelog(np); // Initial state log
   np->state = RUNNABLE;
-  // seld-added: init burstticks and estimatedticks
+  // self-added: init burstticks and estimatedticks
   np->burstticks = 0; // reset burst ticks (T)
   np->estimatedticks = 0; // reset estimated ticks (E)
   np->startreadyticks = ticks; // start ready ticks
@@ -1271,6 +1271,7 @@ pushreadylist(struct proc *p)
     panic("pushreadylist: allocproclistnode");
   }
   // pushbackproclist(&readylist, pn);
+
   // self-added: push to corresponding ready list based on process' priority
   if(p->priority > 99){
     // TODO: pushsortedproclist
@@ -1286,6 +1287,7 @@ pushreadylist(struct proc *p)
     p->queuelevel = 3;
     pushbackproclist(&RRreadylist, pn);
   }
+  //
 }
 
 // scheduler managed, pop from ready list
@@ -1316,6 +1318,7 @@ popreadylist()
   } else {
     return 0; // no runnable processes
   }
+  //
   p = pn->p;
   freeproclistnode(pn);
   return p;
