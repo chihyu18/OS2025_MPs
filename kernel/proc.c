@@ -610,15 +610,20 @@ implicityield(void)
   // }
 
   // self-added
-  if(p->queuelevel == 1 && cmptopsortedproclist(&SJFreadylist, p)) {
-    // if the process is in SJFreadylist and it is not the top process,
-    // yield to the top process
-    yield();
-  } else if(p->queuelevel == 3 && ticks - p->startrunningticks >= 10) {
-    // if the process is in RRreadylist, we always yield
-    yield();
-
+  // preemption between queues
+  if(SJFreadylist.size > 0) {
+    if(p->queuelevel > 1 || (p->queuelevel == 1 && cmptopsortedproclist(&SJFreadylist, p) < 0))
+      yield();
+    
+  } 
+  else if(priorityreadylist.size > 0){
+    if(p->queuelevel > 2) // L2 is non-preemptive
+      yield();
   }
+  else if(p->queuelevel == 3 && ticks - p->startrunningticks >= 10) 
+    // if the process is in RRreadylist, yield after 10 ticks
+    yield();
+  
 }
 
 // A fork child's very first scheduling by scheduler()
