@@ -170,7 +170,7 @@ clockintr()
   acquire(&tickslock);
   ticks++;
   // self-added
-  // aging();
+  aging();
   //
   wakeup(&ticks);
   release(&tickslock);

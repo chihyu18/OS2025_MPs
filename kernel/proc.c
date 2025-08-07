@@ -259,6 +259,9 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  // self-added
+  p->startreadyticks = ticks; // start ready ticks
+  //
   procstatelog(p);
   pushreadylist(p);
 
@@ -394,6 +397,7 @@ priorfork(int priority, int statelogenabled)
   // seld-added: init burstticks and estimatedticks
   np->burstticks = 0; // reset burst ticks (T)
   np->estimatedticks = 0; // reset estimated ticks (E)
+  np->startreadyticks = ticks; // start ready ticks
   //
   procstatelog(np);
   pushreadylist(np);
@@ -543,6 +547,9 @@ scheduler(void)
     // before jumping back to us.
     p->startrunningticks = ticks;
     p->state = RUNNING;
+    // self-added: reset start ready ticks
+    p->startreadyticks = 0; // reset start ready ticks
+    //
     c->proc = p;
     procstatelog(p);
     swtch(&c->context, &p->context);
@@ -590,9 +597,9 @@ yield(void)
   acquire(&p->lock);
   p->state = RUNNABLE;
   // self-added: stop accumulating burst ticks, record the current burst ticks
-  p->burstticks += ticks - p->startrunningticks; // update burst ticks (T)
-  p->startrunningticks = ticks; // reset start running ticks
-  p->startreadyticks = ticks; // reset start ready ticks
+  // p->burstticks += ticks - p->startrunningticks; // update burst ticks (T)
+  p->startrunningticks = 0; // reset start running ticks
+  p->startreadyticks = ticks; // start ready ticks
   //
   procstatelog(p);
   pushreadylist(p);
@@ -605,37 +612,28 @@ void
 aging(void)
 {
   // self-added
-  uint64 now = ticks;
   for (struct proc *p = proc; p < &proc[NPROC]; p++) {
     if (p->state == RUNNABLE) {
-      if (now - p->startreadyticks >= 20) {
+      if (ticks - p->startreadyticks >= 20) {
+        acquire(&p->lock);
         if(p->priority < 149){
-          acquire(&p->lock);
           p->priority++;
-          procstatelog(p);
-          release(&p->lock);
         }
-        // moves between queues
-        if(p->priority == 99){ // 98 -> 99 => L2 -> L1
-          // lazy remove: push to target queue, rm when popping?
-          struct proclistnode *pn = findsortedproclist(&priorityreadylist, p);
-          acquire(&p->lock);
+        p->startreadyticks = ticks; 
+
+        // promote
+        // lazy remove: push to target queue, rm when popping?
+        if (p->priority == 100){ // 99 -> 100 => L2 -> L1
           p->queuelevel = 1;
-          p->estimatedticks = 0;
-          release(&p->lock);
-          pushsortedproclist(&SJFreadylist, pn);
+          pushreadylist(p);
         }
         else if(p-> priority == 50){ // 49 -> 50 => L3 -> L2
-          // move from L3 to L2
-          struct proclistnode *pn = findproclist(&RRreadylist, p);
-          // removeproclist(&RRreadylist, pn);
-          // freeproclistnode(pn);
-          acquire(&p->lock);
           p->queuelevel = 2;
-          release(&p->lock);
-          pushsortedproclist(&priorityreadylist, pn);
+          pushreadylist(p);
         }
-        p->startreadyticks = now; // reset ready timer
+
+        release(&p->lock);
+        
       }
     }
   }
@@ -655,18 +653,22 @@ implicityield(void)
 
   // self-added
   // preemption between queues
-  if(SJFreadylist.size > 0) {
+  if(sizesortedproclist(&SJFreadylist) > 0) {
+    // update first, then compare?
+    p->burstticks += ticks - p->startrunningticks; // update burst ticks (T)
+    p->startrunningticks = ticks; // reset start running ticks
     if(p->queuelevel > 1 || (p->queuelevel == 1 && cmptopsortedproclist(&SJFreadylist, p) < 0))
+      // top of SJFreadylist has higher priority (inside it compares p & readylist.top)
       yield();
   } 
-  else if(priorityreadylist.size > 0){
+  else if(sizesortedproclist(&priorityreadylist) > 0){
     if(p->queuelevel > 2) // L2 is non-preemptive
       yield();
   }
   else if(p->queuelevel == 3 && ticks - p->startrunningticks >= 10) 
     // if the process is in RRreadylist, yield after 10 ticks
     yield();
-  
+  //
 }
 
 // A fork child's very first scheduling by scheduler()
@@ -721,6 +723,7 @@ sleep(void *chan, struct spinlock *lk)
   p->estimatedticks = (p->burstticks + p->estimatedticks) / 2; // update estimated ticks
   p->burstticks = 0; // reset burst ticks (T)
   p->startrunningticks = 0; // reset start running ticks
+  p->startreadyticks = 0; // reset start ready ticks
   //
   procstatelog(p);
 
@@ -803,6 +806,9 @@ kill(int pid)
           panic("kill: findproclist");
         }
         p->state = RUNNABLE;
+        // self-added
+        p->startreadyticks = ticks; // start ready ticks
+        //
         procstatelog(p);
         // remove from channel and push to readylist
         removeproclist(&cn->pl, pn);
@@ -932,12 +938,8 @@ procstatelog(struct proc *p)
 // self-added
 int sjfcompare(struct proc *p1, struct proc *p2)
 {
-  int remainingticks1 = (p1->estimatedticks > p1->burstticks)
-                      ? (p1->estimatedticks - p1->burstticks)
-                      : 0;
-  int remainingticks2 = (p2->estimatedticks > p2->burstticks)
-                      ? (p2->estimatedticks - p2->burstticks)
-                      : 0;
+  int remainingticks1 = p1->estimatedticks - p1->burstticks;
+  int remainingticks2 = p2->estimatedticks - p2->burstticks;
   if(remainingticks1 < remainingticks2) {
     return 1; // p1 has higher priority
   } else if(remainingticks1 > remainingticks2) {
@@ -1218,22 +1220,6 @@ cmptopsortedproclist(struct sortedproclist *spl, struct proc *p)
   ret = spl->cmp(p, pn->p);
   release(&spl->lock);
   return ret;
-}
-
-// self-added
-struct proclistnode*
-findsortedproclist(struct sortedproclist *spl, struct proc *p)
-{
-  struct proclistnode *tmp, *pn;
-  acquire(&spl->lock);
-  pn = 0;
-  for(tmp = spl->head->next; tmp != spl->tail && pn == 0; tmp = tmp->next){
-    if(tmp->p == p){
-      pn = tmp;
-    }
-  }
-  release(&spl->lock);
-  return pn;
 }
 
 // allocate a channel, lock and return if available,

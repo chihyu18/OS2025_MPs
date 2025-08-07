@@ -138,7 +138,7 @@ struct proclistnode* popsortedproclist(struct sortedproclist *spl);
 void            pushsortedproclist(struct sortedproclist *spl, struct proclistnode *pn);
 int             cmptopsortedproclist(struct sortedproclist *spl, struct proc *p);
 // self-added
-struct proclistnode* findsortedproclist(struct sortedproclist *spl, struct proc *p);
+// struct proclistnode* findsortedproclist(struct sortedproclist *spl, struct proc *p);
 
 // channel
 struct channel* allocchannel(void *chan);
