@@ -291,7 +291,6 @@ sys_open(void)
   // If the file is a symbolic link, and O_NOFOLLOW is not specified,
   // then you should read the path in the symbolic link,
   // and return the corresponding file.
-
   char path[MAXPATH];
   int fd, omode;
   struct file *f;
@@ -419,6 +418,24 @@ sys_chdir(void)
   iput(p->cwd);
   end_op();
   p->cwd = ip;
+  return 0;
+}
+
+uint64
+sys_symlink(void)
+{
+  // TODO: symbolic link
+  // You should implement this symlink system call.
+  // char target[MAXPATH], path[MAXPATH];
+  // int fd;
+  // struct file *f;
+  // struct inode *ip;
+
+  // if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+  //   return -1;
+  
+  panic("You should implement symlink system call.");
+
   return 0;
 }
 

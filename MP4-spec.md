@@ -18,7 +18,7 @@ In this part, you are required to extend the xv6 file system to support large fi
 
 **Part A: Writing to a Large File** 
 
-A user program writes a large amount of data. It calls the write() system call.
+A user program writes a large amount of data. It calls the `write()` system call.
 1. `kernel/sysfile.c/sys_write()`
 2. `kernel/file.c/filewrite() `
 3. `kernel/fs.c/writei()`
@@ -51,21 +51,21 @@ addrs. Note that the length of addrs is always 13.
 
 ### Description
 
-In this problem you will add symbolic links to xv6. Symbolic links (or soft links) refer to a linked file by pathname; when a symbolic link is opened, the kernel follows the link to the referred file.. Implementing this system call is a good exercise to understand how pathname lookup works. You will implement the `symlink(char *target, char *path)` system call, which creates a new symbolic link at path that refers to a file named target. In addition, you also need to handle `open` when encountering symbolic links. If the target is also a symbolic link, you must recursively follow it until a non-link file is reached. If the links form a cycle, you must return an error code. You may approximate this by returning an error code if the depth of links reaches some threshold (e.g., 10). However, when a process specifies `O_NOFOLLOW` flags, open should open symbolic links (not targets).
+In this problem you will add symbolic links to xv6. Symbolic links (or soft links) refer to a linked file by pathname; when a symbolic link is opened, the kernel follows the link to the referred file. Implementing this system call is a good exercise to understand how pathname lookup works. You will implement the `symlink(char *target, char *path)` system call, which creates a new symbolic link at path that refers to a file named target. In addition, you also need to handle `open` when encountering symbolic links. If the target is also a symbolic link, you must recursively follow it until a non-link file is reached. If the links form a cycle, you must return an error code. You may approximate this by returning an error code if the depth of links reaches some threshold (e.g., 10). However, when a process specifies `O_NOFOLLOW` flags, open should open symbolic links (not targets).
 
 ## Guidelines and Hints
 
-1. Checkout `kernel/sysfile.c`. There is an unimplemented function sys symlink. Note that system call
+1. Checkout `kernel/sysfile.c`. There is an unimplemented function `sys_symlink`. Note that system call
 symlink is already added in xv6, so you don’t need to worry about that.
 2. Checkout `kernel/stat.h`. There is a new file type `T_SYMLINK`, which represents a symbolic link.
 3. Checkout `kernel/fcntl.h`. There is a new flag `O_NOFOLLOW` that can be used with the open system call.
 4. The target does not need to exist for the system call to succeed.
 5. You will need to store the target path in a symbolic link file, for example, in inode data blocks.
-6. symlink should return an integer representing 0(success) or -1(failure) similar to link and unlink.
+6. `symlink` should return an integer representing 0(success) or -1(failure) similar to link and unlink.
 7. Modify the open system call to handle paths with symbolic links. If the file does not exist, open must fail.
 8. Don’t worry about other system calls (e.g., link and unlink). They must not follow symbolic links; these system calls operate on the symbolic link itself.
 9. You do not have to handle symbolic links to directories in this part.
-10. You can pass problem 2 with modifying only: sysfile.c.
+10. You can pass problem 2 with modifying only: `sysfile.c`.
 
 ## Part 3:  Symbolic Links to Directories
 
@@ -80,10 +80,10 @@ For example, symlink("/y/", "/x/a") creates a symbolic link /x/a links to /y/. T
 
 ## Guidelines and Hints
 
-1. Checkout TODO in the skeleton code.
+1. Checkout `TODO` in the skeleton code.
 2. You can leave sys symlink function unchanged, since symbolic links store paths as strings. There is no difference between a file path and a directory path.
-3. You have to handle paths that consist of symbolic links. Check namex function in fs.c.
-4. You have to handle symbolic links in sys chdir function. Like problem 2, you need to avoid infinite
+3. You have to handle paths that consist of symbolic links. Check `namex` function in fs.c.
+4. You have to handle symbolic links in `sys_chdir` function. Like problem 2, you need to avoid infinite
 loops.
 5. You can pass problem 3 with modifying only: `sysfile.c` and `fs.c`.
 
