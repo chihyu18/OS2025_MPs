@@ -390,14 +390,15 @@ bmap(struct inode *ip, uint bn)
   // TODO: Large Files
   // You should modify bmap(),
   // so that it can handle doubly indrect inode.
-  // uint addr, *a;
-  // struct buf *bp;
+  uint addr, *a;
+  struct buf *bp;
 
   // self-added
-  uint addr, *a2, *a1; // 2 for doubly-indirect blocks, 1 for singly-indirect blocks
-  struct buf *bp2, *bp1;
+  // uint addr, *a2, *a1; // 2 for doubly-indirect blocks, 1 for singly-indirect blocks
+  // struct buf *bp2, *bp1;
 
   // printf("bmap: bn=%d\n", bn);
+  // printf("There are %d blocks in total\n", MAXFILE);
 
   if (bn < NDIRECT){
     if ((addr = ip->addrs[bn]) == 0){
@@ -410,86 +411,116 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
-  // if(bn < NINDIRECT){
-  //   // Load indirect block, allocating if necessary.
-  //   if((addr = ip->addrs[NDIRECT]) == 0){
-  //     addr = balloc(ip->dev);
-  //     if(addr == 0)
-  //       return 0;
-  //     ip->addrs[NDIRECT] = addr;
-  //   }
-  //   bp = bread(ip->dev, addr);
-  //   a = (uint*)bp->data;
-  //   if((addr = a[bn]) == 0){
-  //     addr = balloc(ip->dev);
-  //     if(addr){
-  //       a[bn] = addr;
-  //       log_write(bp);
-  //     }
-  //   }
-  //   brelse(bp);
-  //   return addr;
-  // }
+  if(bn < NINDIRECT){
+    // Load indirect block, allocating if necessary.
+    if((addr = ip->addrs[NDIRECT]) == 0){
+      addr = balloc(ip->dev);
+      if(addr == 0)
+        return 0;
+      ip->addrs[NDIRECT] = addr;
+    }
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[bn]) == 0){
+      addr = balloc(ip->dev);
+      if(addr){
+        a[bn] = addr;
+        log_write(bp);
+      }
+    }
+    brelse(bp);
+    return addr;
+  }
 
-  // panic("bmap: out of range");
+  if(bn < NDOUBLY_INDIRECT){
+    // Load double indirect block, allocating if necessary.
+    if((addr = ip->addrs[NDIRECT + 1]) == 0)
+      ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+
+    // load 2nd layer block.
+    uint double_index = bn / NINDIRECT;
+    if((addr = a[double_index]) == 0){
+      a[double_index] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    // now find disk block.
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    uint pos = bn % NINDIRECT;
+    if ((addr = a[pos]) == 0) {
+      a[pos] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    return addr;
+  }
+
+  panic("bmap: out of range");
 
   // self-added
-  int insecond = 0;
-  if (bn < NDOUBLE){
-    // First doubly-indirect block
-    insecond = 0;
-  }
-  else if (bn < 2 * NDOUBLE){
-    // Second doubly-indirect block
-    insecond = 1;
-    bn -= NDOUBLE;
-  }
-  else{
-    panic("bmap: out of range");
-  }
+  // uint insecond = 0;
+  // if (bn < NDOUBLE){
+  //   // First doubly-indirect block
+  //   insecond = 0;
+  // }
+  // else if (bn < 2 * NDOUBLE){
+  //   // Second doubly-indirect block
+  //   insecond = 1;
+  //   bn -= NDOUBLE;
+  // }
+  // else{
+  //   panic("bmap: out of range");
+  // }
 
-  // Load doubly-indirect block, allocating if necessary.
-  if ((addr = ip->addrs[NDIRECT + insecond]) == 0){
-    addr = balloc(ip->dev);
-    if(addr == 0)
-      return 0;
-    ip->addrs[NDIRECT + insecond] = addr;
-  }
-  bp2 = bread(ip->dev, addr);
-  a2 = (uint *)bp2->data;
+  // // Load doubly-indirect block, allocating if necessary.
+  // if ((addr = ip->addrs[NDIRECT + insecond]) == 0){
+  //   addr = balloc(ip->dev);
+  //   if(addr == 0)
+  //     return 0;
+  //   ip->addrs[NDIRECT + insecond] = addr;
+  // }
+  // bp = bread(ip->dev, addr);
+  // a = (uint *)bp->data;
+  // // printf("bmap: doubly entry: %d\n", NDIRECT + insecond);
 
-  // Load singly-indirect block inside doubly-indirect block
-  uint bn1, bn2;
-  bn1 = bn / NINDIRECT; // index of singly indirect block
-  bn2 = bn % NINDIRECT; // index of data block inside singly indirect block
+  // // Load singly-indirect block inside doubly-indirect block
+  // uint bn1, bnd;
+  // bn1 = bn / NINDIRECT; // index of singly indirect block
+  // bnd = bn % NINDIRECT; // index of data block inside singly indirect block
 
-  if ((addr = a2[bn1]) == 0){
-    addr = balloc(ip->dev);
-    if (addr == 0){
-      brelse(bp2);
-      return 0;
-    }
-    a2[bn1] = addr;
-    log_write(bp2);
-  }
-  bp1 = bread(ip->dev, a2[bn1]);
-  a1 = (uint *)bp2->data;
-  
-  brelse(bp2);
 
-  // Load data block inside singly-indirect block
-  if ((addr = a1[bn2]) == 0){
-    addr = balloc(ip->dev);
-    if (addr == 0){
-      brelse(bp1);
-      return 0;
-    }
-    a1[bn2] = addr;
-    log_write(bp2);
-  }
-  brelse(bp1);
+  // if ((addr = a[bn1]) == 0){
+  //   addr = balloc(ip->dev);
+  //   if (addr == 0){
+  //     brelse(bp);
+  //     return 0;
+  //   }
+  //   a[bn1] = addr;
+  //   log_write(bp);
+  // }
+  // brelse(bp);
 
-  return addr;
+  // bp = bread(ip->dev, addr);
+  // a = (uint *)bp->data;
+  // // printf("bmap: singly entry: %d\n", bn1);
+
+  // // Load data block inside singly-indirect block
+  // if ((addr = a[bnd]) == 0){
+  //   addr = balloc(ip->dev);
+  //   if (addr) {
+  //     a[bnd] = addr;
+  //     log_write(bp); // write singly-indirect block update
+  //   }
+  // }
+  // brelse(bp);
+
+  // // printf("bmap: data block: %d\n", bnd);
+
+  // return addr;
   //
 }
 
@@ -501,11 +532,11 @@ void itrunc(struct inode *ip)
   // You should modify itruc(),
   // so that it can handle doubly indrect inode.
   int i, j;
-  // struct buf *bp;
-  // uint *a;
+  struct buf *bp;
+  uint *a;
   // self-added
-  struct buf *bp2, *bp1; // 2 for doubly-indirect blocks, 1 for singly-indirect blocks
-  uint *a2, *a1;
+  // struct buf *bp2, *bp1; // 2 for doubly-indirect blocks, 1 for singly-indirect blocks
+  // uint *a2, *a1;
 
   for (i = 0; i < NDIRECT; i++)
   {
@@ -516,42 +547,69 @@ void itrunc(struct inode *ip)
     }
   }
 
-  // if(ip->addrs[NDIRECT]){
-  //   bp = bread(ip->dev, ip->addrs[NDIRECT]);
-  //   a = (uint*)bp->data;
-  //   for(j = 0; j < NINDIRECT; j++){
-  //     if(a[j])
-  //       bfree(ip->dev, a[j]);
-  //   }
-  //   brelse(bp);
-  //   bfree(ip->dev, ip->addrs[NDIRECT]);
-  //   ip->addrs[NDIRECT] = 0;
-  // }
+  if(ip->addrs[NDIRECT]){
+    bp = bread(ip->dev, ip->addrs[NDIRECT]);
+    a = (uint*)bp->data;
+    for(j = 0; j < NINDIRECT; j++){
+      if(a[j])
+        bfree(ip->dev, a[j]);
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT]);
+    ip->addrs[NDIRECT] = 0;
+  }
+
+  if(ip->addrs[NDIRECT + 1]){
+    bp = bread(ip->dev, ip->addrs[NDIRECT]);
+    a = (uint*)bp->data;
+    for(j = 0; j < NINDIRECT; j++){
+      if(a[j]){
+        struct buf *bp1 = bread(ip->dev, a[j]);
+        uint *a1 = (uint *)bp1->data;
+        for(int k = 0; k < NINDIRECT; k++){
+          if(a1[k]){
+            bfree(ip->dev, a1[k]);
+          }
+        }
+        brelse(bp1);
+        bfree(ip->dev, a[j]);
+        a[j] = 0; // Clear the pointer in the doubly-indirect block
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT + 1]);
+    ip->addrs[NDIRECT + 1] = 0;
+  }
 
   // self-added
-  for (i = NDIRECT; i < NDIRECT + 2; i++){
-    if (ip->addrs[i]){
-      bp2 = bread(ip->dev, ip->addrs[i]);
-      a2 = (uint *)bp2->data;
-      for (j = 0; j < NINDIRECT; j++){
-        if (a2[j]){
-          bp1 = bread(ip->dev, a2[j]);
-          a1 = (uint *)bp1->data;
-          for (int k = 0; k < NINDIRECT; k++){
-            if (a1[k])
-              bfree(ip->dev, a1[k]);
-          }
-          brelse(bp1);
-          bfree(ip->dev, a2[j]);
-          a2[j] = 0; // Clear the pointer in the doubly-indirect block
-          log_write(bp2);
-        }
-      }
-      brelse(bp2);
-      bfree(ip->dev, ip->addrs[i]);
-      ip->addrs[i] = 0;
-    }
-  }
+  // for (i = NDIRECT; i < NDIRECT + 2; i++){
+  //   if (ip->addrs[i]){
+  //     bp2 = bread(ip->dev, ip->addrs[i]);
+  //     a2 = (uint*)bp2->data;
+  //     for (j = 0; j < NINDIRECT; j++){
+  //       if (a2[j]){
+  //         bp1 = bread(ip->dev, a2[j]);
+  //         a1 = (uint *)bp1->data;
+  //         for (int k = 0; k < NINDIRECT; k++){
+  //           if (a1[k]){
+  //             // printf("freeing data block %d\n", a1[k]);
+  //             bfree(ip->dev, a1[k]);
+  //           }
+              
+  //         }
+  //         brelse(bp1);
+  //         // printf("freeing singly indirect block %d\n", a2[j]);
+  //         bfree(ip->dev, a2[j]);
+  //         a2[j] = 0; // Clear the pointer in the doubly-indirect block
+  //       }
+  //       log_write(bp2);
+  //     }
+  //     brelse(bp2);
+  //     // printf("freeing doubly indirect block %d\n", ip->addrs[i]);
+  //     bfree(ip->dev, ip->addrs[i]);
+  //     ip->addrs[i] = 0;
+  //   }
+  // }
   //
 
   ip->size = 0;
