@@ -133,11 +133,11 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_symlinkdir\
-	$U/_symlinkdir_private\
 	$U/_symlinkfile\
-	$U/_symlinkfile_private\
 	$U/_bigfile\
-	$U/_bigfile_private\
+	# $U/_bigfile_private\
+	# $U/_symlinkdir_private\
+	# $U/_symlinkfile_private\
 
 
 fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
