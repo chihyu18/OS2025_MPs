@@ -29,13 +29,17 @@ struct superblock {
 // #define NDIRECT 12
 // #define NINDIRECT (BSIZE / sizeof(uint))
 // #define MAXFILE (NDIRECT + NINDIRECT)
-//self-added
-#define NDIRECT 11 // 2 doubly-indirect, each with NINDIRECT*NINDIRECT data blocks
-#define NINDIRECT (BSIZE / sizeof(uint))
-#define NDOUBLE (NINDIRECT * NINDIRECT)
-#define MAXFILE (NDIRECT + 2 * NDOUBLE)
-//
 
+// self-added
+// #define NDIRECT 11
+// #define NINDIRECT (BSIZE / sizeof(uint))
+// #define NDOUBLY_INDIRECT ((NINDIRECT) * (NINDIRECT))
+// #define MAXFILE (NDIRECT + 2 * (NDOUBLY_INDIRECT))
+
+#define NDIRECT 7
+#define NINDIRECT (BSIZE / sizeof(uint))
+#define NDOUBLY_INDIRECT NINDIRECT * NINDIRECT
+#define MAXFILE (NDIRECT + 5 * NINDIRECT + NDOUBLY_INDIRECT)
 
 // On-disk inode structure
 
@@ -47,7 +51,7 @@ struct dinode {
   uint size;            // Size of file (bytes)
   // uint addrs[NDIRECT+1];   // Data block addresses
   // self-added
-  uint addrs[NDIRECT + 2]; // Data block addresses, last two are doubly-indirect
+  uint addrs[NDIRECT+6];   // Data block addresses
 };
 
 // Inodes per block.
