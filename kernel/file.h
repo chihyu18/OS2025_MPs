@@ -28,7 +28,7 @@ struct inode {
   uint size;
   // uint addrs[NDIRECT+1]; // TODO: bigfile. If you modify dinode, don't forget here.
   // self-added
-  uint addrs[NDIRECT+2]; 
+  uint addrs[NDIRECT+6]; 
 };
 
 // map major device number to device functions.
