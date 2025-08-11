@@ -26,9 +26,15 @@ struct superblock {
 
 // TODO: bigfile
 // You may need to modify these.
-#define NDIRECT 12
+// #define NDIRECT 12
+// #define NINDIRECT (BSIZE / sizeof(uint))
+// #define MAXFILE (NDIRECT + NINDIRECT)
+
+// self-added
+#define NDIRECT 11
 #define NINDIRECT (BSIZE / sizeof(uint))
-#define MAXFILE (NDIRECT + NINDIRECT)
+#define NDOUBLE NINDIRECT*NINDIRECT
+#define MAXFILE (NDIRECT + 2 * NDOUBLE)
 
 // On-disk inode structure
 struct dinode {
@@ -37,7 +43,9 @@ struct dinode {
   short minor;          // Minor device number (T_DEVICE only)
   short nlink;          // Number of links to inode in file system
   uint size;            // Size of file (bytes)
-  uint addrs[NDIRECT+1];   // Data block addresses
+  // uint addrs[NDIRECT+1];   // Data block addresses
+  // self-added
+  uint addrs[NDIRECT+2];   // Data block addresses
 };
 
 // Inodes per block.
