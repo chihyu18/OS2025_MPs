@@ -386,6 +386,8 @@ bmap(struct inode *ip, uint bn)
   int insecond;
   uint bn1, bn2;
 
+  printf("bmap: bn=%d\n", bn);
+
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
@@ -408,36 +410,43 @@ bmap(struct inode *ip, uint bn)
   // }
 
   // self-added
-  insecond = 0; // second doubly-indirect?
-  if(bn >= NDOUBLE) {
+  if (bn < NDOUBLE) {
+    // First doubly-indirect block
+    insecond = 0;
+  } else if (bn < 2 * NDOUBLE) {
+    // Second doubly-indirect block
     insecond = 1;
     bn -= NDOUBLE;
+  } else {
+    panic("bmap: out of range");
   }
 
-  if(bn < NDOUBLE){
-    // Load doubly-indirect block, allocating if necessary.
-    if((addr = ip->addrs[NDIRECT + insecond]) == 0)
-      ip->addrs[NDIRECT + insecond] = addr = balloc(ip->dev);
-    bp = bread(ip->dev, addr); 
-    a = (uint*)bp->data;
+  // Load doubly-indirect block, allocating if necessary.
+  if((addr = ip->addrs[NDIRECT + insecond]) == 0)
+    ip->addrs[NDIRECT + insecond] = addr = balloc(ip->dev);
+  bp = bread(ip->dev, addr); 
+  a = (uint*)bp->data;
+  printf("bmap: bn=%d, insecond=%d\n", bn, insecond);
 
-    // Load singly-indirect block, allocating if necessary
-    bn1 = bn / NINDIRECT; // index of singly-indirect block
-    bn2 = bn % NINDIRECT; // index of data block in singly-indirect block
-    if((addr = a[bn1]) == 0){
-      a[bn1] = addr = balloc(ip->dev);
-      log_write(bp);
-    }
-    brelse(bp);
-    bp = bread(ip->dev, addr); 
-    a = (uint*)bp->data;
-    if((addr = a[bn2]) == 0){
-      a[bn2] = addr = balloc(ip->dev);
-      log_write(bp);
-    }
-    brelse(bp);
-    return addr;
+  // Load singly-indirect block, allocating if necessary
+  bn1 = bn / NINDIRECT; // index of singly-indirect block
+  bn2 = bn % NINDIRECT; // index of data block in singly-indirect block
+  if((addr = a[bn1]) == 0){
+    a[bn1] = addr = balloc(ip->dev);
+    log_write(bp);
   }
+  brelse(bp);
+  bp = bread(ip->dev, addr); 
+  a = (uint*)bp->data;
+  printf("bmap: bn=%d, insecond=%d, bn1=%d, bn2=%d\n", bn, insecond, bn1, bn2);
+
+  // Load data block, allocating if necessary
+  if((addr = a[bn2]) == 0){
+    a[bn2] = addr = balloc(ip->dev);
+    log_write(bp);
+  }
+  brelse(bp);
+  return addr;
   //
 
   panic("bmap: out of range");
