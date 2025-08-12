@@ -61,6 +61,7 @@ bzero(int dev, int bno)
 // Blocks.
 
 // Allocate a zeroed disk block.
+// returns 0 if out of disk space.
 static uint
 balloc(uint dev)
 {
@@ -85,7 +86,8 @@ balloc(uint dev)
     }
     brelse(bp);
   }
-  panic("balloc: out of blocks");
+  printf("balloc: out of blocks\n");
+  return 0;
 }
 
 // Free a disk block.
@@ -112,8 +114,8 @@ bfree(int dev, uint b)
 // its size, the number of links referring to it, and the
 // list of blocks holding the file's content.
 //
-// The inodes are laid out sequentially on disk at
-// sb.startinode. Each inode has a number, indicating its
+// The inodes are laid out sequentially on disk at block
+// sb.inodestart. Each inode has a number, indicating its
 // position on the disk.
 //
 // The kernel keeps a table of in-use inodes in memory
@@ -218,7 +220,8 @@ ialloc(uint dev, short type)
     }
     brelse(bp);
   }
-  panic("ialloc: no inodes");
+  printf("ialloc: no inodes\n");
+  return 0;
 }
 
 // Copy a modified in-memory inode to disk.
@@ -380,6 +383,7 @@ void iunlockput(struct inode *ip)
 
 // Return the disk block address of the nth block in inode ip.
 // If there is no such block, bmap allocates one.
+// returns 0 if out of disk space.
 static uint
 bmap(struct inode *ip, uint bn)
 {
@@ -388,11 +392,6 @@ bmap(struct inode *ip, uint bn)
   // so that it can handle doubly indrect inode.
   uint addr, *a;
   struct buf *bp;
-  // self-added
-  int insecond;
-  uint bn1, bn2;
-
-  printf("bmap: bn=%d\n", bn);
 
   // self-added
   // uint addr, *a2, *a1; // 2 for doubly-indirect blocks, 1 for singly-indirect blocks
@@ -872,7 +871,14 @@ namex(char *path, int nameiparent, char *name)
   else
     ip = idup(myproc()->cwd);
 
-  while ((path = skipelem(path, name)) != 0)
+  // extract the first path element:
+  // name is the next path element, returned path is the rest of the path
+  // self-added
+  int depth_limit = 10;
+  int depth = 0;
+  char newpath[MAXPATH+1];
+  //
+  while ((path = skipelem(path, name)) != 0) 
   {
     ilock(ip);
     if (ip->type != T_DIR)
@@ -891,8 +897,57 @@ namex(char *path, int nameiparent, char *name)
       iunlockput(ip);
       return 0;
     }
+
+    // self-added
+    struct inode *parent_ip = idup(ip);
+    //
+
     iunlockput(ip);
     ip = next;
+
+    // self-added
+    if(ip->type == T_SYMLINK){
+      char target[MAXPATH];
+      int len;
+
+      if(depth == depth_limit){
+        printf("open: cycle detected while following symlink %s\n", path);
+        end_op();
+        return 0; // reached depth limit, likely a loop
+      }
+
+      ilock(ip);
+
+      if((len = readi(ip, 0, (uint64)target, 0, ip->size)) < 0){
+        iunlockput(ip);
+        end_op();
+        return 0;
+      }
+      target[len] = '\0'; // null-terminate the string
+      if(len > MAXPATH){
+        iunlockput(ip);
+        end_op();
+        return 0; // target path too long
+      }
+      iunlockput(ip);
+
+      // printf("following symlink %s -> %s\n", name, target);
+
+      safestrcpy(newpath, target, sizeof(newpath));
+      if (*path != '\0') {
+          strcat(newpath, "/");
+          strcat(newpath, path);
+      }
+      iput(ip);          // release current inode
+      ip = target[0] == '/' ? iget(ROOTDEV, ROOTINO) : idup(parent_ip); // Start from root if target is absolute
+
+      path = newpath; // Update path to the new target
+      // printf("new path after symlink: %s\n", path);
+
+      depth++;    
+      continue;
+    }
+    //
   }
   if (nameiparent)
   {
