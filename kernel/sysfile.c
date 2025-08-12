@@ -338,6 +338,49 @@ sys_open(void)
       end_op();
       return -1;
     }
+
+    // self-added
+    if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+      char target[MAXPATH];
+      int len;
+
+      // follow the symbolic link til we reach a non-symlink file
+      // or reach a depth limit to prevent infinite loops
+      int depth_limit = 10;
+      int depth = 0;
+      while(depth < depth_limit && ip->type == T_SYMLINK){
+        // read the target path from the symbolic link
+        if((len = readi(ip, 0, (uint64)target, 0, ip->size)) < 0){
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        target[len] = '\0'; // null-terminate the string
+        if(len > MAXPATH){
+          // panic("open: corrupted symlink inode");
+          iunlockput(ip);
+          end_op();
+          return -1; // target path too long
+        }
+        iunlockput(ip);
+
+        if((ip = namei(target)) == 0){
+          end_op();
+          return -1;
+        }
+        ilock(ip);
+        depth++;
+      }
+      if(depth == depth_limit){
+        printf("open: cycle detected while following symlink %s\n", path);
+        iunlockput(ip);
+        end_op();
+        return -1; // reached depth limit, likely a loop
+      }
+
+    }
+    //
+      
   }
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
@@ -453,8 +496,33 @@ sys_symlink(void)
   // if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
   //   return -1;
   
-  panic("You should implement symlink system call.");
+  // panic("You should implement symlink system call.");
 
+  char target[MAXPATH], path[MAXPATH];
+  // int fd;
+  // struct file *f;
+  struct inode *ip;
+
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+  // treat symlink as a file
+  if((ip = create(path, T_SYMLINK, 0, 0)) == 0){
+    end_op();
+    return -1;
+  }
+  // ilock(ip); // create already locks the inode
+
+  // store the target path in the inode
+  writei(ip, 0, (uint64)target, 0, strlen(target) + 1);
+  ip->size = strlen(target) + 1; // include null terminator
+  ip->nlink = 1; // set link count to 1
+  iupdate(ip);
+  iunlockput(ip);
+
+  end_op();
+  
   return 0;
 }
 
