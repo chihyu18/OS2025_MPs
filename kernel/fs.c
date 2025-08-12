@@ -906,7 +906,7 @@ namex(char *path, int nameiparent, char *name)
     ip = next;
 
     // self-added
-    if(ip->type == T_SYMLINK){
+    if(ip->type == T_SYMLINK && *path != '\0'){
       char target[MAXPATH];
       int len;
 
@@ -934,10 +934,8 @@ namex(char *path, int nameiparent, char *name)
       // printf("following symlink %s -> %s\n", name, target);
 
       safestrcpy(newpath, target, sizeof(newpath));
-      if (*path != '\0') {
-          strcat(newpath, "/");
-          strcat(newpath, path);
-      }
+      strcat(newpath, "/");
+      strcat(newpath, path);
       iput(ip);          // release current inode
       ip = target[0] == '/' ? iget(ROOTDEV, ROOTINO) : idup(parent_ip); // Start from root if target is absolute
 
