@@ -73,7 +73,16 @@ Notes:
     2. full 64-bit hex PTEs
     3. virtual address and physical address of PTEs (without offset)
     4. The PTE flag bits V, R, W, X, U.
-5. **physical address of PTEs can be different** to the example output.
+5. **Output Requirements**:
+
+| Part of Output             | Requirement                        |
+| :------------------------- | :--------------------------------- |
+| `page table layout`        | **Must be the same** as the example |
+| `va` (virtual address)     | **Must be the same** as the example |
+| `flags`                    | **Must be the same** as the example |
+| `page table address`       | Can be different                   |
+| `PTE` (Page Table Entry)   | Can be different                   |
+| `physical address of PTEs` | Can be different                   |
 
 Hints:
 
@@ -81,8 +90,8 @@ Hints:
 2. Read ”Chapter 3” of the xv6 book (See Reference), and related files:
 • `kernel/memlayout.h`, which captures the layout of memory.
 • `kernel/vm.c`, which contains most virtual memory code.
-3. Use the macros at the end of the file ‘kernel/riscv.h’.
-4. Use `%p` in your `printf` calls to print out full 64-bit hex PTEs and addresses.
+1. Use the macros at the end of the file `kernel/riscv.h`.
+2. Use `%p` in your `printf` calls to print out full 64-bit hex PTEs and addresses.
 
 ### 2. Add a read only share page
 
